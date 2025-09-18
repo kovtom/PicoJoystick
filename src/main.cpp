@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 int LED = LED_BUILTIN;
+int counter = 0;
 
 void setup() {
   pinMode(LED, OUTPUT);
@@ -8,7 +9,8 @@ void setup() {
 
 void loop() {
   digitalWrite(LED, HIGH);
-  delay(100);
+
   digitalWrite(LED, LOW);
-  delay(1000);
+
+  counter++;
 }
