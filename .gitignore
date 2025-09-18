@@ -37,5 +37,8 @@
 *.out
 *.app
 
+# PlatformIO ideiglenes fájlok
+.pio/
+
 # debug information files
 *.dwo
