@@ -9,7 +9,7 @@
 #include <Adafruit_SSD1306.h>
 #include <MCP3008Reader.h>
 #include <PicoGamepad.h>
-#include <Oversample.h>
+//#include <Oversample.h>
 #include <EMA.h>
 
 #define DEBUG
@@ -31,9 +31,9 @@ LED led(LED_BUILTIN, 1000); // Initialize LED on built-in pin with 100ms toggle 
 const int8_t MCP3008_CS_PIN = 17;              // Chip Select pin for MCP3008
 const uint8_t MCP3008_CHANNELS = 8;            // Number of channels to read
 const uint8_t MCP3008_VALUES_PER_CHANNEL = 21; // Number of values to store per channel
-const uint16_t MCP3008_PROC_TICK_TIME = 10;    // Time interval for reading channels in milliseconds
+//const uint16_t MCP3008_PROC_TICK_TIME = 10;    // Time interval for reading channels in milliseconds
 Adafruit_MCP3008 adcChip;
-MCP3008Reader adcMCP3008(&adcChip, MCP3008_CHANNELS, MCP3008_VALUES_PER_CHANNEL, MCP3008_PROC_TICK_TIME);
+MCP3008Reader adcMCP3008(&adcChip, MCP3008_CHANNELS, MCP3008_VALUES_PER_CHANNEL);
 
 // Initialize I2C for EEPROM
 arduino::MbedI2C Wire1(6, 7);
@@ -45,25 +45,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire1, OLED_RESET);
 
 // Initialize PicoGamepad
 PicoGamepad joystick;
-
-// Initialize Oversample
-Oversample *sampler;
-
-// Initialize EMA for smoothing
-// EMA<8, uint32_t> ema[MCP3008_CHANNELS]; // 4 bits for smoothing, uint32_t for larger range
-// uint32_t filtered[MCP3008_CHANNELS] = {0};
-//
-// Core 1 Task
-//
-void core1Task()
-{
-  led.off();
-  while (true)
-  {
-    led.refresh();
-    delay(1);
-  }
-}
 
 // Log to Serial
 void logToSerial(const String &message)
@@ -114,10 +95,6 @@ void setup()
   // Init Serial and wait for connection
   if (!Serial)
     Serial.begin(115200);
-  /*while (!Serial) {
-    led.refresh(50);
-    delay(5);
-  }*/
   logToSerial("Program started");
 
   // Init I2C for EEPROM
@@ -154,18 +131,6 @@ void setup()
   display.clearDisplay();
   display.display();
 
-  // Template for writing EEPROM
-  /*  if(updateUint16ToEEPROM(0, 700) != 0) {
-    logToSerial("Failed to write to EEPROM at address 0");
-  } else {
-    logToSerial("Successfully wrote to EEPROM at address 0");
-  }
-  if(updateUint16ToEEPROM(2, 190) != 0) {
-    logToSerial("Failed to write to EEPROM at address 2");
-  } else {
-    logToSerial("Successfully wrote to EEPROM at address 2");
-  } */
-
   // Read limits from EEPROM
   ch4_limter_min = readUint16FromEEPROM(0);
   ch4_limter_max = readUint16FromEEPROM(2);
@@ -181,82 +146,13 @@ void setup()
       delay(100);
     }
   }
-  // core1 indítása
-  // multicore_launch_core1(core1Task);
-
-  // Init sampler
-  sampler = new Oversample(&adcChip, 1, 13); // 14
-  byte resolution = sampler->getResolution();
-  logToSerial("Oversample resolution: " + String(resolution) + " bits");
 }
-
-// Measure processing time for reading channels multiple times
-// uint32_t measureProcTime1Step(uint16_t interval) {
-//   led.on();
-//   uint32_t startTime = micros();
-//   for(int i = 0; i < interval; i++) {
-//       adcMCP3008.readChannels();
-//   }
-//   uint32_t endTime = micros();
-//   led.off();
-//   return endTime - startTime;
-// }
-
-// void measureProcTime() {
-//   uint16_t interval = 16;
-//   while(interval <= 2048) {
-//     uint32_t procTime = measureProcTime1Step(interval);
-//     Serial.println("Proc time for " + String(interval) + " reads: " + String(procTime) + " us");
-//     Serial.println("Proc time for " + String(interval) + " reads: " + String(procTime/1000) + " ms");
-//     interval *= 2;
-//   }
-// }
-
-uint32_t lastTime = millis();
-// uint32_t startTime = 0;
-// uint32_t endTime = 0;
 
 void loop()
 {
+  static uint32_t lastTime = 0;
+  
   adcMCP3008.readChannelsWithEMA();
-
-  // startTime = micros();
-  // for (int i = 0; i < MCP3008_CHANNELS; i++)
-  // {
-  //   filtered[i] = ema[i](adcChip.readADC(i));
-  // }
-  // endTime = micros();
-
-  // if (millis() - lastTime > 100)
-  // {
-  //   lastTime = millis();
-  //   for (int i = 0; i < MCP3008_CHANNELS; i++)
-  //   {
-  //     Serial.print(" | CH" + String(i) + ": " + String(adcMCP3008.getEMAValues(i)) + " | ");
-  //   }
-  //   Serial.println();
-  // }
-
-  // uint32_t startTime = micros();
-
-  // int single = adcChip.readADC(1);
-  // double oversampled = sampler->read();
-  // long scaled = sampler->readDecimated();
-
-  // uint32_t endTime = micros();
-  // // Log the results
-  // logToSerial("Single: " + String(single) +
-  //             ", Oversampled: " + String(oversampled, 7) +
-  //             ", Scaled: " + String(scaled) +
-  //             ", Time: " + String(endTime - startTime) + " us");
-
-  // delay(100);
-
-  //  measureProcTime();
-  //  delay(2000);
-
-  //   led.refresh(1000);
-  //   //delay(1);
 
   if (millis() - lastTime > 50)
   {
@@ -267,20 +163,6 @@ void loop()
     joystick.SetRy(adcMCP3008.getMappedJoystickValue(CHANNEL_THROTTLE_RIGHT));
     joystick.SetSlider(adcMCP3008.getMappedJoystickValue(CHANNEL_BRAKE_LEFT));
     joystick.SetDial(adcMCP3008.getMappedJoystickValue(CHANNEL_BRAKE_RIGHT));
-#ifdef DEBUG
-    // logToSerial("CH0: " + String(adcMCP3008.getMappedJoystickValue(CHANNEL_HAND_WHEEL)));
-    // logToSerial("CH0 raw: " + String(adcMCP3008.getEMAValues(CHANNEL_HAND_WHEEL)));
-    // logToSerial("CH1: " + String(adcMCP3008.getMappedJoystickValue(CHANNEL_RUDDER)));
-    // logToSerial("CH1 raw: " + String(adcMCP3008.getMedianValue(CHANNEL_RUDDER)));
-    // logToSerial("CH2: " + String(adcMCP3008.getMappedJoystickValue(CHANNEL_THROTTLE_LEFT)));
-    // logToSerial("CH2 raw: " + String(adcMCP3008.getMedianValue(CHANNEL_THROTTLE_LEFT)));
-    // logToSerial("CH3: " + String(adcMCP3008.getMappedJoystickValue(CHANNEL_THROTTLE_RIGHT)));
-    // logToSerial("CH3 raw: " + String(adcMCP3008.getMedianValue(CHANNEL_THROTTLE_RIGHT)));
-    // logToSerial("CH4: " + String(adcMCP3008.getMappedJoystickValue(CHANNEL_BRAKE_LEFT)));
-    // logToSerial("CH4 raw: " + String(adcMCP3008.getMedianValue(CHANNEL_BRAKE_LEFT)));
-    // logToSerial("CH5: " + String(adcMCP3008.getMappedJoystickValue(CHANNEL_BRAKE_RIGHT)));
-    // logToSerial("CH5 raw: " + String(adcMCP3008.getMedianValue(CHANNEL_BRAKE_RIGHT)));
-#endif
     joystick.send_update();
   }
 }

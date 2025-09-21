@@ -5,7 +5,7 @@
 #include <Arduino.h>
 #include <stdint.h>
 #include <vector>
-#include <algorithm> // sort, max_element
+//#include <algorithm> // sort, max_element
 #include <Adafruit_MCP3008.h>
 #include <EMA.h>
 
@@ -26,8 +26,8 @@ const int CHANNEL_EMPTY_2 = 7; // Channel number not used
 
 struct channelMixMaxValues
 {
-    int minValue;
-    int maxValue;
+    uint32_t minValue;
+    uint32_t maxValue;
     bool isInverted = false; // Alapértelmezés szerint nem invertált
     bool isActive = true;  // Alapértelmezés szerint aktív
 };
@@ -43,62 +43,32 @@ const channelMixMaxValues channelMinMaxValues_[] = {
     {0, 1023, false, false}   // CHANNEL_EMPTY_2
 };
 
-//
-// Osztaly vagy tipus mely ket adatot tartalmaz:
-// - egy mert erteket 16 bites integer formaban
-// - egy 8 bites interger mely a meres sorszamat tartalmazza
-struct MeasuredValue {
-  int16_t value;   // A mért érték
-  uint8_t index;  // A mérés sorszáma
-};
 
 //
-// Az MCP3008-rol származó analóg bemenetek olvasására szolgáló osztály
-// Az Adafruit_MCP3008 osztálybol származik,
-// mely tarolja a beolvasott MeasuredValue értékeket egy 2D vektorban
+// MCP3008Reader Class
 //
 class MCP3008Reader {
 public:
-  MCP3008Reader(Adafruit_MCP3008* adc, const uint8_t channelNumber, const uint8_t arraySize, const uint16_t procTickTime);
+  MCP3008Reader(Adafruit_MCP3008* adc,
+                const uint8_t channelNumber,
+                const uint8_t arraySize);
   
-  // Az aktuális csatornaértékek beolvasása és tárolása a values_ vektorban
-  bool refresh();
-
-  std::vector<std::vector<MeasuredValue>> values_;
-
-  // Visszatér a megadott csatorna kozepso ertekevel
-  int16_t getMedianValue(uint8_t channel);
 
   // Map-olt joystick adatok lekerese az adott csatornarol
   int16_t getMappedJoystickValue(uint8_t channel);
 
-  // Az csatornak ertekinek beolvasasa es tarolasa az adcValue_buffer_ vektorban
-  void readChannels();
-
+  // EMA szurites alkalmazasa az osszes csatornara
   void readChannelsWithEMA();
 
+  // EMA ertek lekerese az adott csatornarol
   uint32_t getEMAValues(uint8_t channel);
 
 private:
   uint8_t arraySize_;
   uint8_t CHANNEL_NUMBER_;
-  std::vector<int16_t> adcValue_buffer_;
-  uint16_t procTickTime_;
-  uint32_t lastTickTime_;
   Adafruit_MCP3008* adc_;
   EMA<8, uint32_t> ema_[CHANNEL_COUNT]; // EMA szűrők minden csatornához
   uint32_t emaValues_[CHANNEL_COUNT] = {0}; // EMA értékek tárolása minden csatornához
-
-  // Az adcValue_buffer_ ertekek beszurasa a values_ vektorba a legnagyobb indexu helyre
-  void insertNewValues();
-
-  // A vektorban levo index ertekek oregitese, mely soran az index ertekek eggyel novekszenek
-  void ageIndices();
-
-  // Az adott csatorna vektorat sorbarendezi az ertekek alapjan
-  void sortChannelByValue(uint8_t channel);
-
-  // Az osszes csatorna vektorának sorbarendezése az ertekek alapjan
-  void sortAllChannelsByValue();
 };
+
 #endif // MCP3008READER_H
